@@ -9,7 +9,6 @@ flags = ['-O3', '-march=native', '-flto']
 
 env = Environment(ENV       = {'TERM': environ['TERM']},
                   CXX       = 'g++',
-                  CPPPATH   = ['src'],
 
                   CCFLAGS   = ['-Wall', '-Wextra', '-Wno-unused-result', '-Wno-uninitialized', '-Wno-unused-parameter'] + flags,
                   CPPFLAGS  = ['-Dstricmp=strcasecmp', '-Dlinux', '-DRELEASE'],
