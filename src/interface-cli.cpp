@@ -183,7 +183,7 @@ int main(int argc, char * argv[])
 		bool ignoreerrors=false;
 		string par;
 		bool verbose=libcon_interactive;
-		while (par=libcon_option())
+		while ((par=libcon_option()))
 		{
 			if (par=="-werror") werror=true;
 			else if (par=="-nocheck") ignoreerrors=true;

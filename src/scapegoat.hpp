@@ -1,5 +1,4 @@
 #pragma once
-#define nullptr NULL
 
 #if 0
 //Using my own class instead seems to improve both speed and executable size.
@@ -81,12 +80,12 @@ public:
 	lightweight_map(double alpha=0.55) : root(nullptr), rigidDelete(false), autoBalance(true), minRebalanceSize(3), realSize(0), maxSize(0) {
 		setAlpha(alpha);
 	}
-	
+
 	void clear()
 	{
 		while (root && root->key) remove(root->key);
 	}
-	
+
 	~lightweight_map()
 	{
 		clear();
@@ -204,7 +203,7 @@ private:
 	void traverse_r(node* curr, void (*action)(const Key& key, Data& data)) {
 		//Perform for the current node
 		action(curr->key, curr->data);
-	
+
 		//Recurse
 		if (curr->left) {
 			traverse_r(curr->left, action);
@@ -507,24 +506,24 @@ public:
 	{
 		map.create(key)=value;
 	}
-	
+
 	bool find(string key, Data& result)
 	{
 		if (!map.exists(key)) return false;
 		result=map.find(key);
 		return true;
 	}
-	
+
 	void remove(string key)
 	{
 		map.remove(key);
 	}
-	
+
 	void clear()
 	{
 		map.reset();
 	}
-	
+
 	void traverse(void (*action)(const string& key, Data& data))
 	{
 		map.each(action);
