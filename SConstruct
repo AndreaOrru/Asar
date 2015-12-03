@@ -12,7 +12,7 @@ env = Environment(ENV       = {'TERM': environ['TERM']},
 
                   CCFLAGS   = ['-Wall', '-Wextra', '-Wno-unused-result', '-Wno-uninitialized', '-Wno-unused-parameter'] + flags,
                   CPPFLAGS  = ['-Dstricmp=strcasecmp', '-Dlinux', '-DRELEASE'],
-                  CXXFLAGS  = ['-std=c++98', '-fno-rtti'],
+                  CXXFLAGS  = ['-std=c++11', '-fno-rtti'],
                   LINKFLAGS = flags)
 
 
