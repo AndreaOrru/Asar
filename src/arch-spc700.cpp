@@ -192,8 +192,8 @@ bool asblock_spc700(char** word, int numwords)
 #define w1(hex) do { write1(hex); write1(getnum(math)); return true; } while(0)
 #define w2(hex) do { write1(hex); write2(getnum(math)); return true; } while(0)
 #define wv(hex1, hex2) do { if (getlen(math)==1) { write1(hex1); write1(getnum(math)); } else { write1(hex2); write2(getnum(math)); } return true; } while(0)
-#define wr(hex) do { int len=getlen(math); int num=getnum(math); int pos=(len==1)?num:num-(snespos+2); write1(hex); write1(pos); \
-								if (pass && foundlabel && (pos<-128 || pos>127)) error(2, S"Relative branch out of bounds (distance is "+dec(pos)+")"); \
+#define wr(hex) do { int len=getlen(math); int num=getnum(math); int pos=(len==1)?num:num-((snespos&0xFFFFFF)+2); write1(hex); write1(pos); \
+								if (pass==2 && foundlabel && (pos<-128 || pos>127)) error(2, S"Relative branch out of bounds (distance is "+dec(pos)+")"); \
 								return true; } while(0)
 #define op0(str, hex) if (isop(str)) w0(hex)
 #define op1(str, hex) if (isop(str)) w1(hex)
@@ -371,7 +371,7 @@ bool asblock_spc700(char** word, int numwords)
 				cc("x"      , "sp"     ) w0(0x9D);
 				cc("y"      , "a"      ) w0(0xFD);
 				cc("sp"     , "x"      ) w0(0xBD);
-				
+
 				vc("(","+x)", "a"      ) w1(0xC7, s1);
 				vc("(",")+y", "a"      ) w1(0xD7, s1);
 				vc("","+x"  , "a"      ) wv(0xD4, 0xD5, s1);
@@ -381,7 +381,7 @@ bool asblock_spc700(char** word, int numwords)
 				vc("","+y"  , "x"      ) w1(0xD9, s1);
 				vc("",""    , "x"      ) wv(0xD8, 0xC9, s1);
 				vc("",""    , "y"      ) wv(0xCB, 0xCC, s1);
-				
+
 				cv("a"      , "#",""   ) w1(0xE8, s2);
 				cv("a"      , "(","+x)") w1(0xE7, s2);
 				cv("a"      , "","+x"  ) wv(0xF4, 0xF5, s2);
@@ -393,7 +393,7 @@ bool asblock_spc700(char** word, int numwords)
 				cv("y"      , "#",""   ) w1(0x8D, s2);
 				cv("y"      , "","+x"  ) w1(0xFB, s2);
 				cv("y"      , "",""    ) wv(0xEB, 0xEC, s2);
-				
+
 				vv("",""    , "#",""   ) w11(0x8F, s2, s1);
 				vv("",""    , "",""    ) w11(0xFA, s2, s1);
 			}
@@ -413,17 +413,17 @@ bool asblock_spc700(char** word, int numwords)
 				if (is("cmp")) offset=0x60;
 				if (is("adc")) offset=0x80;
 				if (is("sbc")) offset=0xA0;
-				
+
 				cc("a"  , "(x)"    ) w0(offset+0x06);
 				cc("(x)", "(y)"    ) w0(offset+0x19);
-				
+
 				cv("a"  , "#",""   ) w1(offset+0x08, s2);
 				cv("a"  , "(","+x)") w1(offset+0x07, s2);
 				cv("a"  , "(",")+y") w1(offset+0x17, s2);
 				cv("a"  , "","+x"  ) wv(offset+0x14, offset+0x15, s2);
 				cv("a"  , "","+y"  ) w2(offset+0x16, s2);
 				cv("a"  , "",""    ) wv(offset+0x04, offset+0x05, s2);
-				
+
 				vv("","", "#",""   ) w11(offset+0x18, s2, s1);
 				vv("","", "",""    ) w11(offset+0x09, s2, s1);
 			}

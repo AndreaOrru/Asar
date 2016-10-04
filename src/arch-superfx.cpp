@@ -48,6 +48,16 @@ static bool getreg(const char * par, int * reg, reg_t type)
 	return true;
 }
 
+//for LMS and SMS short addressing forms, check range & evenness
+static bool check_short_addr(int num) {
+	if (num % 2 > 0 || num < 0 || num > 0x1FE) {
+		error(0, S"Invalid short address argument: $" + hex(num) +
+			" (must be even number and $0000-$01FE)");
+		return false;
+	}
+	return true;
+}
+
 bool asblock_superfx(char** word, int numwords)
 {
 #define is(test) (!stricmp(word[0], test))
@@ -136,26 +146,26 @@ bool asblock_superfx(char** word, int numwords)
 				op("OR")   range(1, 15) w(0xC0);
 				op("INC")  range(0, 14) w(0xD0);
 				op("DEC")  range(0, 14) w(0xE0);
-				
+
 				op("ADC")                w3d(0x50);
 				op("SBC")                w3d(0x60);
 				op("BIC")   range(1, 15) w3d(0x70);
 				op("UMULT")              w3d(0x80);
 				op("LJMP")  range(8, 13) w3d(0x90);
 				op("XOR")   range(1, 15) w3d(0xC0);
-				
+
 				op("CMP") w3f(0x60);
 			}
 			if (getreg(par, &reg, reg_hash))
 			{
 				op("LINK") range(1, 4) w(0x90);
-				
+
 				op("ADD")               w3e(0x50);
 				op("SUB")               w3e(0x60);
 				op("AND")  range(1, 15) w3e(0x70);
 				op("MULT")              w3e(0x80);
 				op("OR")   range(1, 15) w3e(0xC0);
-				
+
 				op("ADC")                w3f(0x50);
 				op("BIC")   range(1, 15) w3f(0x70);
 				op("UMULT")              w3f(0x80);
@@ -195,9 +205,9 @@ bool asblock_superfx(char** word, int numwords)
 				}
 				else
 				{
-					int pos=num-(snespos+2);
+					int pos=num-((snespos&0xFFFFFF)+2);
 					write1(byte); write1(pos);
-					if (pass && (pos<-128 || pos>127))
+					if (pass==2 && (pos<-128 || pos>127))
 					{
 						error(2, S"Relative branch out of bounds (distance is "+dec(pos)+")");
 					}
@@ -250,7 +260,15 @@ bool asblock_superfx(char** word, int numwords)
 					if (!endpar || endpar[1]) return false;
 					int num=getnum(arg[1]);
 					op("LM") w(0x3D) w(0xF0+reg1) w(num) w(num>>8);
-					op("LMS") w(0x3D) w(0xA0+reg1) w(num);
+
+					if (is("LMS")) {
+						ok();
+						if (check_short_addr(num))
+						{
+							ok() w(0x3D) w(0xA0+reg1) w(num>>1);
+						}
+					}
+
 					if (num&1 || num>=0x200)
 					{
 						op("MOVE") w(0x3D) w(0xF0+reg1) w(num) w(num>>8);
@@ -287,7 +305,16 @@ bool asblock_superfx(char** word, int numwords)
 					if (!endpar || endpar[1]) return false;
 					int num=getnum(arg[0]);
 					op("SM") w(0x3E) w(0xF0+reg2) w(num) w(num>>8);
-					op("SMS") w(0x3E) w(0xA0+reg2) w(num);
+
+					if (is("SMS"))
+					{
+						ok();
+						if (check_short_addr(num))
+						{
+							ok() w(0x3E) w(0xA0+reg2) w(num>>1);
+						}
+					}
+
 					if (num&1 || num>=0x200)
 					{
 						op("MOVE") w(0x3E) w(0xF0+reg2) w(num) w(num>>8);

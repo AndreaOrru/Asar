@@ -14,7 +14,7 @@
 
 extern const int asarver_maj=1;
 extern const int asarver_min=3;
-extern const int asarver_bug=6;
+extern const int asarver_bug=7;
 extern const bool asarver_beta=false;
 
 #ifdef _I_RELEASE
@@ -92,7 +92,7 @@ bool setmapper()
 		}
 	}
 	mapper=bestmap;
-	
+
 	//detect oddball mappers
 	int mapperbyte=romdata[snestopc(0x00FFD5)];
 	int romtypebyte=romdata[snestopc(0x00FFD6)];

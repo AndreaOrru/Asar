@@ -1,5 +1,5 @@
 # Asar
-Originally written by **Alcaro**. Based on version v1.36.
+Originally written by **Alcaro**. Based on version v1.37.
 
 Asar is a SNES assembler, intended as a replacement for xkas v0.06.
 

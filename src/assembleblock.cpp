@@ -432,6 +432,7 @@ int freespaceline[256];
 int freespaceorgpos[256];
 int freespaceorglen[256];
 bool freespacestatic[256];
+unsigned char freespacebyte[256];
 
 void cleartable()
 {
@@ -509,6 +510,7 @@ void initstuff()
 			freespaceleak[i]=true;
 			freespaceorgpos[i]=-2;
 			freespaceorglen[i]=-1;
+			freespacebyte[i] = 0x00;
 		}
 	}
 	arch=arch_65816;
@@ -537,15 +539,15 @@ void initstuff()
 	freespaceid=1;
 	freespaceextra=0;
 	numopcodes=0;
-	
+
 	math_pri=false;
 	math_round=true;
-	
+
 	if (arch==arch_65816) asinit_65816();
 	if (arch==arch_spc700) asinit_spc700();
 	if (arch==arch_spc700_inline) asinit_spc700();
 	if (arch==arch_superfx) asinit_superfx();
-	
+
 	warnxkas=false;
 	emulatexkas=false;
 }
@@ -665,7 +667,7 @@ void assembleblock(const char * block)
 		}
 		if (is("if") && !moreonline) numif++;
 		bool cond;
-		
+
 		char ** nextword=word+1;
 		char * condstr=NULL;
 		while (true)
@@ -687,7 +689,7 @@ void assembleblock(const char * block)
 					if (foundlabel) error(1, S"Label in "+lower(word[0])+" command");
 					thiscond=(val>0);
 				}
-				
+
 				if (condstr && nextword[1])
 				{
 					if (strcmp(condstr, nextword[1])) error(1, "Invalid condition");
@@ -712,7 +714,7 @@ void assembleblock(const char * block)
 				else if (!strcmp(nextword[1], "!=")) thiscond=(par1!=par2);
 				//else if (!strcmp(nextword[1], "<>")) thiscond=(par1!=par2);
 				else error(0, S"Broken "+lower(word[0])+" command");
-				
+
 				if (condstr && nextword[3])
 				{
 					if (strcmp(condstr, nextword[3])) error(1, "Invalid condition");
@@ -757,7 +759,7 @@ void assembleblock(const char * block)
 		//	if (foundlabel) error(1, "Label in if or assert command");
 		//	cond=(val>0);
 		//}
-		
+
 		if (is("if"))
 		{
 			if(0);
@@ -987,6 +989,7 @@ void assembleblock(const char * block)
 		if (is("freecode")) parstr=S"ram,"+parstr;
 		if (is("freedata")) parstr=S"noram,"+parstr;
 		autoptr<char**> pars=split(parstr.str, ",");
+		unsigned char fsbyte = 0x00;
 		int useram=-1;
 		bool fixedpos=false;
 		bool align=false;
@@ -1019,13 +1022,17 @@ void assembleblock(const char * block)
 				if (!leakwarn) error(0, "Invalid freespace request.");
 				leakwarn=false;
 			}
-			else error(0, "Invalid freespace request.");
+			else
+			{
+				fsbyte = getnum(pars[i]);
+			}
 		}
 		if (useram==-1) error(0, "Invalid freespace request.");
 		if (mapper==hirom && useram) error(0, "No banks contain the RAM mirrors in hirom.");
 		if (mapper==norom) error(0, "Can't find freespace in norom.");
 		freespaceend();
 		freespaceid=getfreespaceid();
+		freespacebyte[freespaceid] = fsbyte;
 		if (pass==0) snespos=(freespaceid<<24)|0x8000;
 		if (pass==1)
 		{
@@ -1037,7 +1044,7 @@ void assembleblock(const char * block)
 				/*if (freespaceorgpos[freespaceid]==-2)   error(1, "A static freespace must be targeted by at least one autoclean.");*/
 			}
 			if (fixedpos && freespaceorgpos[freespaceid]) freespacepos[freespaceid]=snespos=(freespaceid<<24)|freespaceorgpos[freespaceid];
-			else freespacepos[freespaceid]=snespos=(freespaceid<<24)|getsnesfreespace(freespacelen[freespaceid], useram, true, true, align);
+			else freespacepos[freespaceid]=snespos=(freespaceid<<24)|getsnesfreespace(freespacelen[freespaceid], useram, true, true, align, freespacebyte[freespaceid]);
 		}
 		if (pass==2)
 		{
@@ -1113,7 +1120,7 @@ void assembleblock(const char * block)
 				{
 					ratsloc=ratsstart(orgpos)+8;
 					freespaceorglen[targetid]=read2(ratsloc-4)+1;
-					if (!freespacestatic[targetid] && pass==1) removerats(orgpos);
+					if (!freespacestatic[targetid] && pass==1) removerats(orgpos, freespacebyte[targetid]);
 				}
 				else if (ratsloc<0) ratsloc=0;
 				write1(firstbyte);
@@ -1135,7 +1142,7 @@ void assembleblock(const char * block)
 				if (pass==1 && num>=0)
 				{
 					ratsloc=ratsstart(orgpos)+8;
-					if (!freespacestatic[targetid]) removerats(orgpos);
+					if (!freespacestatic[targetid]) removerats(orgpos, freespacebyte[targetid]);
 				}
 				else if (!ratsloc) ratsloc=0;
 				if ((start==num || start<0) && pass==2)
@@ -1146,7 +1153,7 @@ void assembleblock(const char * block)
 			}
 			else error(0, "Broken autoclean command");
 		}
-		else if (pass==0) removerats(getnum(word[1]));
+		else if (pass==0) removerats(getnum(word[1]), 0x00);
 	}
 	else if (is0("pushpc"))
 	{

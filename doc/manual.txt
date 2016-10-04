@@ -105,7 +105,7 @@ Removed and limited commands:
 New commands:
 - freespace/freecode/freedata: Automatic freespace finders, including automatic RATS tags. freespace
   is expected to be followed by a comma separated list of details on which kind of freespace is
-  required. Valid details are ram, noram, align, cleaned, and static:
+  required. Valid details are ram, noram, align, cleaned, static, and a $xx byte:
   - ram tells that the RAM mirrors must exist (which means the data must be in banks 10-3F), while
     noram tells that the RAM mirrors aren't needed (which makes Asar favor banks 40-6F and F0-FF,
     but it'll put it the patch the earlier banks if no freespace in the favored banks is available);
@@ -115,6 +115,8 @@ New commands:
     with an autoclean on a couple of read1() instructions Asar can't figure out.
   - static tells that the freespace may not move, once assigned; any attempt to make it grow will
     result in an error being thrown.
+  - $xx byte argument (e.g. $FF) tells freespace to search for contiguous chunks of that byte.
+    Default is $00 if not supplied. Autoclean will clean the ROM using this byte also.
   freecode is a shortcut to freespace ram, and freedata is a shortcut to freespace noram.
 - autoclean: This one will remove a freespace block in an existing ROM. It must not be placed in
   freespace, and it must be followed by JML, JSL, dl, or a mathematical expression (for example

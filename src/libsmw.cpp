@@ -70,20 +70,20 @@ static void handleprot(int loc, char * name, int len, unsigned char * contents)
 		strncpy(name, "NULL", 4);//to block recursion, in case someone is an idiot
 		if (len%3) return;
 		len/=3;
-		for (int i=0;i<len;i++) removerats((contents[(i*3)+0]    )|(contents[(i*3)+1]<<8 )|(contents[(i*3)+2]<<16));
+		for (int i=0;i<len;i++) removerats((contents[(i*3)+0]    )|(contents[(i*3)+1]<<8 )|(contents[(i*3)+2]<<16), 0x00);
 	}
 }
 
-void removerats(int snesaddr)
+void removerats(int snesaddr, unsigned char clean_byte)
 {
 	int addr=ratsstart(snesaddr);
 	if (addr<0) return;
 	WalkMetadata(addr+8, handleprot);
 	addr=snestopc(addr);
-	for (int i=(romdata[addr+4]|(romdata[addr+5]<<8))+8;i>=0;i--) romdata[addr+i]=0;
+	for (int i=(romdata[addr+4]|(romdata[addr+5]<<8))+8;i>=0;i--) romdata[addr+i]=clean_byte;
 }
 
-static inline int trypcfreespace(int start, int end, int size, int banksize, int minalign)
+static inline int trypcfreespace(int start, int end, int size, int banksize, int minalign, unsigned char freespacebyte)
 {
 	while (start+size<=end)
 	{
@@ -111,7 +111,7 @@ static inline int trypcfreespace(int start, int end, int size, int banksize, int
 		bool bad=false;
 		for (int i=0;i<size;i++)
 		{
-			if (romdata[start+i]!=0x00)
+			if (romdata[start+i]!=freespacebyte)
 			{
 				start+=i;
 				if (!i) start++;//this could check for a rats tag instead, but somehow I think this will give better performance.
@@ -139,7 +139,7 @@ static inline int trypcfreespace(int start, int end, int size, int banksize, int
 //isforcode=true tells it to favor banks 40+, false tells it to avoid them entirely.
 //It automatically adds a RATS tag.
 
-int getpcfreespace(int size, bool isforcode, bool autoexpand, bool respectbankborders, bool align)
+int getpcfreespace(int size, bool isforcode, bool autoexpand, bool respectbankborders, bool align, unsigned char freespacebyte)
 {
 	if (!size) return 0x1234;//in case someone protects zero bytes for some dumb reason.
 		//You can write zero bytes to anywhere, so I'll just return something that removerats will ignore.
@@ -152,11 +152,11 @@ int getpcfreespace(int size, bool isforcode, bool autoexpand, bool respectbankbo
 		if (romlen>0x200000 && !isforcode)
 		{
 			int pos=trypcfreespace(0x200000-8, (romlen<0x400000)?romlen:0x400000, size,
-					respectbankborders?0x7FFF:0xFFFFFF, align?0x7FFF:(respectbankborders || size<32768)?0:0x7FFF);
+					respectbankborders?0x7FFF:0xFFFFFF, align?0x7FFF:(respectbankborders || size<32768)?0:0x7FFF, freespacebyte);
 			if (pos>=0) return pos;
 		}
 		int pos=trypcfreespace(0x80000, (romlen<0x200000)?romlen:0x200000, size,
-				respectbankborders?0x7FFF:0xFFFFFF, align?0x7FFF:(respectbankborders || size<32768)?0:0x7FFF);
+				respectbankborders?0x7FFF:0xFFFFFF, align?0x7FFF:(respectbankborders || size<32768)?0:0x7FFF, freespacebyte);
 		if (pos>=0) return pos;
 		if (autoexpand)
 		{
@@ -194,12 +194,12 @@ int getpcfreespace(int size, bool isforcode, bool autoexpand, bool respectbankbo
 	if (mapper==hirom)
 	{
 		if (isforcode) return -1;
-		return trypcfreespace(0, romlen, size, 0xFFFF, align?0xFFFF:0);
+		return trypcfreespace(0, romlen, size, 0xFFFF, align?0xFFFF:0, freespacebyte);
 	}
 	if (mapper==sfxrom)
 	{
 		if (isforcode) return -1;
-		return trypcfreespace(0, romlen, size, 0x7FFF, align?0x7FFF:0);
+		return trypcfreespace(0, romlen, size, 0x7FFF, align?0x7FFF:0, freespacebyte);
 	}
 	if (mapper==sa1rom)
 	{
@@ -213,7 +213,7 @@ int getpcfreespace(int size, bool isforcode, bool autoexpand, bool respectbankbo
 				if (sa1banks[i]<=romlen && sa1banks[i]+0x100000>romlen) nextbank=sa1banks[i];
 				continue;
 			}
-			int pos=trypcfreespace(sa1banks[i]?sa1banks[i]:0x80000, sa1banks[i]+0x100000, size, 0x7FFF, align?0x7FFF:0);
+			int pos=trypcfreespace(sa1banks[i]?sa1banks[i]:0x80000, sa1banks[i]+0x100000, size, 0x7FFF, align?0x7FFF:0, freespacebyte);
 			if (pos>=0) return pos;
 		}
 		if (autoexpand && nextbank>=0)
@@ -268,9 +268,9 @@ void WalkMetadata(int loc, void(*func)(int loc, char * name, int len, unsigned c
 	}
 }
 
-int getsnesfreespace(int size, bool isforcode, bool autoexpand, bool respectbankborders, bool align)
+int getsnesfreespace(int size, bool isforcode, bool autoexpand, bool respectbankborders, bool align, unsigned char freespacebyte)
 {
-	return pctosnes(getpcfreespace(size, isforcode, autoexpand, respectbankborders, align));
+	return pctosnes(getpcfreespace(size, isforcode, autoexpand, respectbankborders, align, freespacebyte));
 }
 
 bool openrom(const char * filename, bool confirm)
@@ -335,22 +335,22 @@ static unsigned int getchecksum()
 	{
 		int power2 = 0;
 		int size = CalculatedSize;
-		
+
 		while (size >>= 1)
 			power2++;
-	
+
 		size = 1 << power2;
 		uint32 remainder = CalculatedSize - size;
-	
-	
+
+
 		int i;
-	
+
 		for (i = 0; i < size; i++)
 			sum1 += ROM [i];
-	
+
 		for (i = 0; i < (int) remainder; i++)
 			sum2 += ROM [size + i];
-	
+
 		int sub = 0;
 		if (Settings.BS&& ROMType!=0xE5)
 		{
@@ -372,8 +372,8 @@ static unsigned int getchecksum()
     		{
 				sum1 += sum2 * (size / remainder);
     		}
-	
-	
+
+
     sum1 &= 0xffff;
     Memory.CalculatedChecksum=sum1;
 	}

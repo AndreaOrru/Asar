@@ -1,7 +1,5 @@
-asar
-
-# SCons stuff
-.sconsign.dblite
+# Prerequisites
+*.d
 
 # Compiled Object files
 *.slo
@@ -20,6 +18,7 @@ asar
 
 # Fortran module files
 *.mod
+*.smod
 
 # Compiled Static libraries
 *.lai
@@ -27,7 +26,14 @@ asar
 *.a
 *.lib
 
+# SCons database
+.sconsign.dblite
+
+# Mac files
+.DS_Store
+
 # Executables
 *.exe
 *.out
 *.app
+asar

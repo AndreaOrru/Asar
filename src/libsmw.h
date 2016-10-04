@@ -58,10 +58,10 @@ inline int snestopc(int addr)
 		{
 			return sa1banks[(addr&0xE00000)>>21]|((addr&0x1F0000)>>1)|(addr&0x007FFF);
 		}
-		if ((addr&0xC00000)==0xC00000)
-		{
-			return sa1banks[(addr&0x700000)>>20]|(addr&0x1FFFFF);
-		}
+        if ((addr&0xC00000)==0xC00000)
+        {
+            return sa1banks[((addr&0x100000)>>20)|((addr&0x200000)>>19)]|(addr&0x0FFFFF);
+        }
 		return -1;
 	}
 	if (mapper==bigsa1rom)
@@ -104,7 +104,7 @@ inline int pctosnes(int addr)
 	{
 		for (int i=0;i<8;i++)
 		{
-			if (sa1banks[i]==(addr&0x600000)) return 0x008000|(i<<21)|((addr&0x0F8000)<<1)|(addr&0x7FFF);
+			if (sa1banks[i]==(addr&0x700000)){ return 0x008000|(i<<21)|((addr&0x0F8000)<<1)|(addr&0x7FFF);}
 		}
 		return -1;
 	}
@@ -132,11 +132,11 @@ inline int pctosnes(int addr)
 	return -1;
 }
 
-int getpcfreespace(int size, bool isforcode, bool autoexpand=true, bool respectbankborders=true, bool align=false);
-int getsnesfreespace(int size, bool isforcode, bool autoexpand=true, bool respectbankborders=true, bool align=false);
+int getpcfreespace(int size, bool isforcode, bool autoexpand=true, bool respectbankborders=true, bool align=false, unsigned char freespacebyte=0x00);
+int getsnesfreespace(int size, bool isforcode, bool autoexpand=true, bool respectbankborders=true, bool align=false, unsigned char freespacebyte=0x00);
 
 void resizerats(int snesaddr, int newlen);
-void removerats(int snesaddr);
+void removerats(int snesaddr, unsigned char clean_byte);
 int ratsstart(int pcaddr);
 
 bool goodchecksum();
