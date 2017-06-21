@@ -1,7 +1,7 @@
 # Asar
 Originally written by **Alcaro**. Based on version v1.50 (fixes by RPG Hacker, Raidenthequick, p4plus2).
 
-This repository provides just the minimal modifications to easily build the program on Unix systems.
+This repository provides just the minimal modifications to easily build the program on Unix systems. I only removed the `*.exe` and `*.dll` files and added a SCons build script.
 
 ### Instructions
 You will need a working C++ compiler (g++ or clang++) and SCons.
