@@ -62,12 +62,14 @@ void assign(const char * newstr, int newlen)
 
 string& operator=(const char * newstr)
 {
+	if (bufferlen == 0) init();
 	assign(newstr);
 	return *this;
 }
 
 string& operator=(string newstr)
 {
+	if (bufferlen == 0) init();
 	assign(newstr);
 	return *this;
 }
@@ -190,10 +192,23 @@ string(const char * newstr)
 	init();
 	assign(newstr);
 }
+string(const char * newstr, int newlen)
+{
+	init();
+	assign(newstr, newlen);
+}
 string(const string& old)
 {
 	init();
 	assign(old.str);
+}
+string(int intval)
+{
+	init();
+	char buf[16];
+	memset(buf, sizeof(buf), intval);
+	sprintf(buf, "%i", intval);
+	assign(buf);
 }
 ~string()
 {
@@ -420,10 +435,12 @@ inline string bin(unsigned int value)
 	return buffer;
 }
 
-inline string ftostr(double value)
+inline string ftostr(long double value)
 {
 	char rval[256];
-	sprintf(rval, "%f", value);
+	// RPG Hacker: Ridiculously high precision, I know, but we're working with long doubles
+	// here and can afforc it, so no need to waste any precision
+	sprintf(rval, "%.100Lf", value);
 	if (strchr(rval, '.'))//nuke useless zeroes
 	{
 		char * end=strrchr(rval, '\0')-1;
@@ -433,6 +450,45 @@ inline string ftostr(double value)
 			end--;
 		}
 		if (*end=='.') *end='\0';
+	}
+	return rval;
+}
+
+// Same as above, but with variable precision
+inline string ftostrvar(long double value, int precision)
+{
+	int clampedprecision = precision;
+	if (clampedprecision < 0) clampedprecision = 0;
+	if (clampedprecision > 100) clampedprecision = 100;
+
+	// RPG Hacker: Not the prettiest solution, but simple enough, and avoids security risks from using sprintf()
+	// (Note that those really matter that much)
+	static const char * formats[] =
+	{
+		"%.0f", "%.1f", "%.2f", "%.3f", "%.4f", "%.5f", "%.6f", "%.7", "%.8f", "%.9f",
+		"%.10f", "%.11f", "%.12f", "%.13f", "%.14f", "%.15f", "%.16f", "%.17", "%.18f", "%.19f",
+		"%.20f", "%.21f", "%.22f", "%.23f", "%.24f", "%.25f", "%.26f", "%.27", "%.28f", "%.29f",
+		"%.30f", "%.31f", "%.32f", "%.33f", "%.34f", "%.35f", "%.36f", "%.37", "%.38f", "%.39f",
+		"%.40f", "%.41f", "%.42f", "%.43f", "%.44f", "%.45f", "%.46f", "%.47", "%.48f", "%.49f",
+		"%.50f", "%.51f", "%.52f", "%.53f", "%.54f", "%.55f", "%.56f", "%.57", "%.58f", "%.59f",
+		"%.60f", "%.61f", "%.62f", "%.63f", "%.64f", "%.65f", "%.66f", "%.67", "%.68f", "%.69f",
+		"%.70f", "%.71f", "%.72f", "%.73f", "%.74f", "%.75f", "%.76f", "%.77", "%.78f", "%.79f",
+		"%.80f", "%.81f", "%.82f", "%.83f", "%.84f", "%.85f", "%.86f", "%.87", "%.88f", "%.89f",
+		"%.90f", "%.91f", "%.92f", "%.93f", "%.94f", "%.95f", "%.96f", "%.97", "%.98f", "%.99f",
+		"%.100f"
+	};
+
+	char rval[256];
+	sprintf(rval, formats[clampedprecision], value);
+	if (strchr(rval, '.'))//nuke useless zeroes
+	{
+		char * end = strrchr(rval, '\0') - 1;
+		while (*end == '0')
+		{
+			*end = '\0';
+			end--;
+		}
+		if (*end == '.') *end = '\0';
 	}
 	return rval;
 }
@@ -692,3 +748,48 @@ inline char * stristr(const char * string, const char * pattern)
 const char * unhtml(const char * html);
 const char * tohtml(const char * text);
 const char * htmlentities(const char * text);
+
+
+
+// Returns number of connected lines - 1
+template<typename stringarraytype>
+inline int getconnectedlines(stringarraytype& lines, int startline, string& out)
+{
+	out = string("");
+	int count = 1;
+
+	for (int i = startline; lines[i]; i++)
+	{
+		// The line should already be stripped of any comments at this point
+		int startpos = strlen(lines[i]);
+
+		bool found = false;
+
+		for (int j = startpos; j > 0; j--)
+		{
+			if (!isspace(lines[i][j]) && lines[i][j] != '\0' && lines[i][j] != ';')
+			{
+				if (lines[i][j] == '\\')
+				{
+					count++;
+					out += string(lines[i], j);
+					found = true;
+					break;
+				}
+				else
+				{
+					out += string(lines[i], j + 1);
+					return count - 1;
+				}
+			}
+		}
+
+		if (!found)
+		{
+			out += string(lines[i], 1);
+			return count - 1;
+		}
+	}
+
+	return count - 1;
+}

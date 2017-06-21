@@ -13,8 +13,8 @@
 #include "asar.h"
 
 extern const int asarver_maj=1;
-extern const int asarver_min=3;
-extern const int asarver_bug=7;
+extern const int asarver_min=5;
+extern const int asarver_bug=0;
 extern const bool asarver_beta=false;
 
 #ifdef _I_RELEASE
@@ -61,7 +61,7 @@ bool setmapper()
 {
 	int maxscore=-99999;
 	mapper_t bestmap=lorom;
-	mapper_t maps[]={lorom, hirom};
+	mapper_t maps[]={lorom, hirom, exlorom, exhirom};
 	for (size_t mapid=0;mapid<sizeof(maps)/sizeof(maps[0]);mapid++)
 	{
 		mapper=maps[mapid];
@@ -159,6 +159,14 @@ static int getlenforlabel(int snespos, int thislabel, bool exists)
 		else if ((thislabel>>16)==optimizeforbank) return 2;
 		else return 3;
 	}
+	else if((thislabel >> 16) == 0x7E && (thislabel & 0xFFFF) < 0x100)
+	{
+		return 1;
+	}
+	else if ((thislabel >> 16) == 0x7E && (thislabel & 0xFFFF) < 0x2000)
+	{
+		return 2;
+	}
 	else if ((thislabel|snespos)&0xFF000000)
 	{
 		if ((thislabel^snespos)&0xFF000000) return 3;
@@ -244,25 +252,23 @@ extern bool forwardlabel;
 
 int getnum(const char * str)
 {
-//	if (str[0]=='+' || str[0]=='-')
-//	{
-//		int i;
-//		for (i=0;str[i];i++)
-//		{
-//			if (str[i]!=str[0]) goto notposneglabel;
-//		}
-//		if (!str[i])
-//		{
-//			foundlabel=true;
-//			if (str[0]=='+') forwardlabel=true;
-//			if (str[0]=='+') return labelval(S":pos_"+dec(i)+"_"+dec(poslabels[i]))&0xFFFFFF;
-//			else             return labelval(S":neg_"+dec(i)+"_"+dec(neglabels[i]))&0xFFFFFF;
-//			return 0;
-//		}
-//	}
-//notposneglabel:
 	const char * e;
-	int num=math(str, &e);
+	// RPG Hacker: this was originally an int - changed it into an unsigned int since I found
+	// that to yield the more predictable results when converting from a double
+	// (e.g.: $FFFFFFFF was originally converted to $80000000, whereas now it remains $FFFFFFFF
+	unsigned int num=math(str, &e);
+	if (e)
+	{
+		error<errblock>(1, e);
+	}
+	return num;
+}
+
+// RPG Hacker: Same function as above, but doesn't truncate our number via int conversion
+long double getnumdouble(const char * str)
+{
+	const char * e;
+	long double num = math(str, &e);
 	if (e)
 	{
 		error<errblock>(1, e);
@@ -284,7 +290,12 @@ struct stricompare {
 	}
 };
 
-lightweight_map<string, char**> filecontents;
+struct sourcefile {
+	char** contents;
+	int numlines;
+};
+
+lightweight_map<string, sourcefile> filecontents;
 lightweight_map<string, string> defines;
 
 void assembleblock(const char * block);
@@ -403,9 +414,9 @@ void resolvedefines(string& out, const char * start)
 					{
 						string newval;
 						resolvedefines(newval, val);
-						int num=getnum(newval);
+						long double num= getnumdouble(newval);
 						if (foundlabel) error<errline>(0, "!Define #= Label is not allowed");
-						defines.insert(defname, dec(num));
+						defines.insert(defname, ftostr(num));
 						break;
 					}
 					case setifnotset:
@@ -490,6 +501,7 @@ void assembleline(const char * fname, int linenum, const char * line)
 
 extern int numif;
 extern int numtrue;
+extern autoarray<whiletracker> whilestatus;
 
 int incsrcdepth=0;
 
@@ -499,9 +511,11 @@ void assemblefile(const char * filename, bool toplevel)
 	thisfilename=filename;
 	thisline=-1;
 	thisblock=NULL;
-	char ** lines;
+	sourcefile file;
+	file.contents = NULL;
+	file.numlines = 0;
 	int startif=numif;
-	if (!filecontents.find(filename, lines))
+	if (!filecontents.find(filename, file))
 	{
 		char * temp=readfile(filename);
 		if (!temp)
@@ -509,35 +523,40 @@ void assemblefile(const char * filename, bool toplevel)
 			error<errnull>(0, "Couldn't open file");
 			return;
 		}
-		lines=split(temp, "\n");
-		for (int i=0;lines[i];i++)
+		file.contents =split(temp, "\n");
+		for (int i=0;file.contents[i];i++)
 		{
-			char * line=lines[i];
+			file.numlines++;
+			char * line= file.contents[i];
 			char * comment=line;
 			while ((comment=strqchr(comment, ';')))
 			{
-				if (comment[1]!='@') comment[0]='\0';
+				if (comment[1]!='@')
+				{
+					comment[0]='\0';
+				}
 				else
 				{
-					if (strncasecmp(comment+2, "xkas", 4)) comment[1]=' ';
+					// RPG Hacker: Why was this line even needed to begin with?
+					//if (strncasecmp(comment+2, "xkas", 4)) comment[1]=' ';
 					comment[0]=' ';
 				}
 			}
 			while (strqchr(line, '\t')) *strqchr(line, '\t')=' ';
 			if (!confirmquotes(line)) { thisline=i; thisblock=line; error<errnull>(0, "Mismatched quotes"); line[0]='\0'; }
 			itrim(line, " ", " ", true);
-			for (int j=1;strqchr(line, ',') && !strqchr(line, ',')[1] && lines[i+j];j++)
+			for (int j=1;strqchr(line, ',') && !strqchr(line, ',')[1] && file.contents[i+j];j++)
 			{
-				strcat(line, lines[i+j]);
+				strcat(line, file.contents[i+j]);
 				static char nullstr[]="";
-				lines[i+j]=nullstr;
+				file.contents[i+j]=nullstr;
 			}
 		}
-		filecontents.insert(filename, lines);
+		filecontents.insert(filename, file);
 	}
 	bool inmacro=false;
 	asarverallowed=true;
-	for (int i=0;lines[i];i++)
+	for (int i=0;file.contents[i] && i<file.numlines;i++)
 	{
 		try
 		{
@@ -545,13 +564,13 @@ void assemblefile(const char * filename, bool toplevel)
 			thisline=i;
 			thisblock=NULL;
 			istoplevel=toplevel;
-			if (stribegin(lines[i], "macro ") && numif==numtrue)
+			if (stribegin(file.contents[i], "macro ") && numif==numtrue)
 			{
 				if (inmacro) error<errline>(0, "Nested macro definition");
 				inmacro=true;
-				if (!pass) startmacro(lines[i]+6);
+				if (!pass) startmacro(file.contents[i]+6);
 			}
-			else if (!stricmp(lines[i], "endmacro") && numif==numtrue)
+			else if (!stricmp(file.contents[i], "endmacro") && numif==numtrue)
 			{
 				if (!inmacro) error<errline>(0, "Misplaced endmacro");
 				inmacro=false;
@@ -559,12 +578,20 @@ void assemblefile(const char * filename, bool toplevel)
 			}
 			else if (inmacro)
 			{
-				if (!pass) tomacro(lines[i]);
+				if (!pass) tomacro(file.contents[i]);
 			}
-			else assembleline(filename, i, lines[i]);
+			else
+			{
+				int prevnumif = numif;
+				string connectedline;
+				int skiplines = getconnectedlines<char**>(file.contents, i, connectedline);
+				assembleline(filename, i, connectedline);
+				i += skiplines;
+				if (numif != prevnumif && whilestatus[numif].iswhile && whilestatus[numif].cond)
+					i = whilestatus[numif].startline - 1;
+			}
 		}
 		catch (errline&) {}
-		asarverallowed=false;
 	}
 	thisline++;
 	thisblock=NULL;
@@ -591,6 +618,7 @@ void assemblefile(const char * filename, bool toplevel)
 bool checksum=true;
 extern lightweight_map<string, unsigned int> labels;
 extern autoarray<string> sublabels;
+extern autoarray<writtenblockdata> writtenblocks;
 extern string ns;
 
 struct macrodata
@@ -614,11 +642,13 @@ static void clearmacro(const string & key, macrodata* & macro)
 	cfree(macro);
 }
 
-static void clearfile(const string & key, char** & filecontent)
+static void clearfile(const string & key, sourcefile& filecontent)
 {
-	cfree(*filecontent);
-	cfree(filecontent);
+	cfree(*filecontent.contents);
+	cfree(filecontent.contents);
 }
+
+void closecachedfiles();
 
 void reseteverything()
 {
@@ -628,29 +658,14 @@ void reseteverything()
 
 	macros.traverse(clearmacro);
 	macros.clear();
-	//while (str=macros.rootKey())
-	//{
-	//	macrodata * macro;
-	//	macros.find(str, macro);
-	//	macro->lines.~autoarray();
-	//	free(macro->fname);
-	//	free(macro->arguments[0]);
-	//	free(macro->arguments);
-	//	free(macro);
-	//	macros.remove(str);
-	//}
 
 	filecontents.traverse(clearfile);
 	filecontents.clear();
-	//while (str=filecontents.rootKey())
-	//{
-	//	char ** filecontent;
-	//	filecontents.find(str, filecontent);
-	//	free(*filecontent);
-	//	free(filecontent);
-	//	filecontents.remove(str);
-	//}
+
+	writtenblocks.reset();
 
 	optimizeforbank=-1;
+
+	closecachedfiles();
 #undef free
 }

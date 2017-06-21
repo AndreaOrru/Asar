@@ -25,6 +25,8 @@ extern const char * thisfilename;
 extern int thisline;
 extern const char * thisblock;
 
+extern autoarray<whiletracker> whilestatus;
+
 void assembleline(const char * fname, int linenum, const char * line);
 
 int reallycalledmacros;
@@ -135,7 +137,9 @@ void callmacro(const char * data)
 			thisline=thisone->startline+i+1;
 			thisblock=NULL;
 			string out;
-			string intmp=thisone->lines[i];
+			string connectedline;
+			int skiplines = getconnectedlines<autoarray<string> >(thisone->lines, i, connectedline);
+			string intmp = connectedline;
 			for (char * in=intmp.str;*in;)
 			{
 				if (*in=='<' && in[1]=='<')
@@ -175,8 +179,12 @@ void callmacro(const char * data)
 				}
 				else out+=*(in++);
 			}
-			calledmacros=numcm;
+			calledmacros = numcm;
+			int prevnumif = numif;
 			assembleline(thisone->fname, thisone->startline+i, out);
+			i += skiplines;
+			if (numif != prevnumif && whilestatus[numif].iswhile && whilestatus[numif].cond)
+				i = whilestatus[numif].startline - thisone->startline - 1;
 		}
 		catch(errline&){}
 	}

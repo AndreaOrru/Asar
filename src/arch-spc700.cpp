@@ -14,8 +14,8 @@ static void inline_finalizeorg()
 		int pcpos=snestopc(writesizeto&0xFFFFFF);
 		if (pcpos<0) error(2, S"SNES address "+hex6(realsnespos)+" doesn't map to ROM");
 		int num=snespos-startpos;
-		romdata[pcpos  ]=num    ;
-		romdata[pcpos+1]=num>> 8;
+		writeromdata_byte(pcpos, num);
+		writeromdata_byte(pcpos+1, num >> 8);
 	}
 	writesizeto=-1;
 }

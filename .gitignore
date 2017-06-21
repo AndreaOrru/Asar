@@ -26,14 +26,10 @@
 *.a
 *.lib
 
-# SCons database
-.sconsign.dblite
-
-# Mac files
-.DS_Store
-
 # Executables
 *.exe
 *.out
 *.app
-asar
+
+/.sconsign.dblite
+/asar

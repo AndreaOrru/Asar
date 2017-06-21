@@ -1,5 +1,7 @@
 #pragma once
-extern unsigned char * romdata;
+#include <cstdio>
+
+extern const unsigned char * romdata;
 extern int romlen;
 extern const char * openromerror;
 bool openrom(const char * filename, bool confirm=true);
@@ -12,18 +14,22 @@ enum mapper_t {
 	sa1rom,
 	bigsa1rom,
 	sfxrom,
-	norom,
+	exlorom,
+	exhirom,
+	norom
 } extern mapper;
 
 extern int sa1banks[8];//only 0, 1, 4, 5 are used
 
-//#define CONV_UNHEADERED 0
-//#define CONV_HEADERED 1
-//#define CONV_PCTOSNES 2
-//#define CONV_SNESTOPC 0
-//#define CONV_LOROM 0
-//int convaddr(int addr, int mode);
-//Tip: Use snestopc and pctosnes if possible.
+void writeromdata(int pcoffset, const void * indata, int numbytes);
+void writeromdata_byte(int pcoffset, unsigned char indata);
+void writeromdata_bytes(int pcoffset, unsigned char indata, int numbytes);
+
+struct writtenblockdata {
+	int pcoffset;
+	int snesoffset;
+	int numbytes;
+};
 
 inline int snestopc(int addr)
 {
@@ -41,6 +47,29 @@ inline int snestopc(int addr)
 		if ((addr&0xFE0000)==0x7E0000 ||//wram
 			(addr&0x408000)==0x000000)//hardware regs, ram mirrors, other strange junk
 				return -1;
+		return addr&0x3FFFFF;
+	}
+	if (mapper==exlorom)
+	{
+		if ((addr&0xF00000)==0x700000 ||//wram, sram
+			(addr&0x408000)==0x000000)//area that shouldn't be used in lorom
+				return -1;
+		if (addr&0x800000)
+		{
+			addr=((addr&0x7F0000)>>1|(addr&0x7FFF));
+		}
+		else
+		{
+			addr=((addr&0x7F0000)>>1|(addr&0x7FFF))+0x400000;
+		}
+		return addr;
+	}
+	if (mapper==exhirom)
+	{
+		if ((addr&0xFE0000)==0x7E0000 ||//wram
+			(addr&0x408000)==0x000000)//hardware regs, ram mirrors, other strange junk
+			return -1;
+		if ((addr&0xC00000)!=0xC00000) return (addr&0x3FFFFF)|0x400000;
 		return addr&0x3FFFFF;
 	}
 	if (mapper==sfxrom)
@@ -92,19 +121,38 @@ inline int pctosnes(int addr)
 		if (addr>=0x400000) return -1;
 		addr=((addr<<1)&0x7F0000)|(addr&0x7FFF)|0x8000;
 		return addr|0x800000;
-		//if ((addr&0xF00000)==0x700000) return addr|0x800000;
-		//return addr;
 	}
 	if (mapper==hirom)
 	{
 		if (addr>=0x400000) return -1;
 		return addr|0xC00000;
 	}
+	if (mapper == exlorom)
+	{
+		if (addr>=0x800000) return -1;
+		if (addr&0x400000)
+		{
+			addr-=0x400000;
+			addr=((addr<<1)&0x7F0000)|(addr&0x7FFF)|0x8000;
+			return addr;
+		}
+		else
+		{
+			addr=((addr<<1)&0x7F0000)|(addr&0x7FFF)|0x8000;
+			return addr|0x800000;
+		}
+	}
+	if (mapper == exhirom)
+	{
+		if (addr>=0x800000) return -1;
+		if (addr&0x400000) return addr;
+		return addr|0xC00000;
+	}
 	if (mapper==sa1rom)
 	{
 		for (int i=0;i<8;i++)
 		{
-			if (sa1banks[i]==(addr&0x700000)){ return 0x008000|(i<<21)|((addr&0x0F8000)<<1)|(addr&0x7FFF);}
+			if (sa1banks[i]==(addr&0x600000)){ return 0x008000|(i<<21)|((addr&((i<4) ? 0x0F8000 : 0x1F8000))<<1)|(addr&0x7FFF);}
 		}
 		return -1;
 	}
@@ -143,4 +191,4 @@ bool goodchecksum();
 void fixchecksum();
 
 void WalkRatsTags(void(*func)(int loc, int len));//This one calls func() for each RATS tag in the ROM. The pointer is SNES format.
-void WalkMetadata(int loc, void(*func)(int loc, char * name, int len, unsigned char * contents));//This one calls func() for each metadata block in the RATS tag whose contents (metadata) start at loc in the ROM. Do not replace name with an invalid metadata name, and note that name is not null terminated.
+void WalkMetadata(int loc, void(*func)(int loc, char * name, int len, const unsigned char * contents));//This one calls func() for each metadata block in the RATS tag whose contents (metadata) start at loc in the ROM. Do not replace name with an invalid metadata name, and note that name is not null terminated.
